@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
 # --- 【重要】修正匯入路徑和名稱 ---
-from .app import database # <--- 修正為 database.py 檔案
+from app import database # <-- 正確的絕對匯入
 
 app = FastAPI(title="Internship API - JobTruth")
 
