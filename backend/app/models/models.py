@@ -5,7 +5,7 @@ Base = declarative_base()
 
 # 【重要】請確認您的資料表名稱是否為 'job'
 class Job(Base):
-    __tablename__ = "job"
+    __tablename__ = "internship"
 
     # 欄位定義必須與您匯入 20 萬筆數據的資料表結構匹配
     id = Column(Integer, primary_key=True, index=True)
