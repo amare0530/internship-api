@@ -19,4 +19,4 @@ def root():
     return {"status": "Server OK", "message": "Internship API is running (REAL DATA CONNECTED)"}
 
 # 註冊路由：所有在 job.py 中的路由都會被加入
-app.include_router(job.router, prefix="/jobs")
+app.include_router(job.router, prefix="/jobs", tags=["Jobs"])

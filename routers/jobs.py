@@ -2,8 +2,9 @@
 from fastapi import APIRouter, HTTPException
 from app import database
 
-# 設置 router 的標籤 (tags)，但不需要 prefix
-router = APIRouter()
+# 設置 router 的標籤 (tags)，讓 FastAPI 知道這些路由屬於 'Jobs'
+router = APIRouter(tags=["Jobs"])
+
 
 # 1. 職缺列表 (URL 將是 /jobs)
 @router.get("/") 

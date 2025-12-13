@@ -14,7 +14,8 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL 環境變數未設定！請檢查您的 .env 檔案。")
 
 TARGET_ROWS = 200000
-BASE_DATA_PATH = "dataAPPsource.csv" # 使用您上傳的檔案名稱
+# 修正路徑：使用 '../' 指向專案根目錄的 CSV 檔案
+BASE_DATA_PATH = "../dataAPPsource.csv" 
 
 # --- 1. 資料擴充功能 (已修正 TypeError) ---
 
@@ -25,9 +26,11 @@ def augment_data_from_csv(base_data_path: str, target_rows: int):
     print(f"--- 讀取基礎 CSV 檔案：{base_data_path} ---")
     
     try:
+        # 使用 UTF-8 編碼讀取 CSV
         base_df = pd.read_csv(base_data_path, encoding='utf-8')
     except FileNotFoundError:
-        raise FileNotFoundError(f"錯誤：找不到基礎 CSV 檔案 {base_data_path}，請確認它在專案根目錄。")
+        # 當找不到檔案時拋出錯誤
+        raise FileNotFoundError(f"錯誤：找不到基礎 CSV 檔案 {base_data_path}，請確認檔案路徑。")
     except Exception as e:
         print(f"讀取 CSV 發生錯誤：{e}")
         return None
@@ -35,9 +38,8 @@ def augment_data_from_csv(base_data_path: str, target_rows: int):
     initial_count = len(base_df)
     print(f"✅ 成功讀取 {initial_count} 筆基礎數據。")
     
-    # ------------------ 🚨 修正 Type Error 區域 🚨 ------------------
-    # 確保薪資欄位是數字。errors='coerce' 會將非數字值（如'面議'）轉換為 NaN。
-    # .fillna(0) 將 NaN 設為 0。astype(int) 轉換為整數。
+    # ------------------ 薪資欄位類型修正 ------------------
+    # 將薪資欄位轉換為數字，非數字值（如'面議'）轉為 NaN，再將 NaN 轉為 0
     base_df['NT_L'] = pd.to_numeric(base_df['NT_L'], errors='coerce').fillna(0).astype(int)
     base_df['NT_U'] = pd.to_numeric(base_df['NT_U'], errors='coerce').fillna(0).astype(int)
     # ----------------------------------------------------------------
@@ -45,10 +47,10 @@ def augment_data_from_csv(base_data_path: str, target_rows: int):
     if initial_count >= target_rows:
         return base_df.head(target_rows)
 
-    # 計算需要複製的次數
+    # 計算需要複製的次數以達到目標筆數
     replication_factor = (target_rows // initial_count) + 1
     
-    # 擴充數據的隨機變數
+    # 擴充數據的隨機變數列表
     common_cities = ['台北市', '新北市', '桃園市', '台中市', '高雄市', '台南市', '新竹市']
     experience_levels = ['無', '1年以上', '2年以上', '3年以上', '5年以上']
     salary_adjustments = [-1000, 0, 1000, 2000, 3000, 5000, 10000]
@@ -58,11 +60,11 @@ def augment_data_from_csv(base_data_path: str, target_rows: int):
     for i in range(replication_factor):
         temp_df = base_df.copy()
         
-        # 隨機調整薪資 (現在 NT_L 已經是數字了，可以進行加法運算)
+        # 隨機調整薪資
         adj = random.choice(salary_adjustments)
         temp_df['NT_L'] = temp_df['NT_L'] + adj
         temp_df['NT_U'] = temp_df['NT_U'] + adj
-        temp_df['NT_L'] = temp_df['NT_L'].apply(lambda x: max(0, x))
+        temp_df['NT_L'] = temp_df['NT_L'].apply(lambda x: max(0, x)) # 確保最低薪資不為負
         
         # 隨機調整地點
         temp_df['CITYNAME'] = [random.choice(common_cities) for _ in range(len(temp_df))]
@@ -70,7 +72,7 @@ def augment_data_from_csv(base_data_path: str, target_rows: int):
         # 隨機調整經驗
         temp_df['EXPERIENCE'] = [random.choice(experience_levels) for _ in range(len(temp_df))]
         
-        # 輕微修改公司名稱 (確保數據看起來不一樣)
+        # 輕微修改公司名稱以區分複製的數據
         temp_df['COMPNAME'] = temp_df['COMPNAME'].astype(str) + " (" + str(i % 5) + ")"
         
         augmented_list.append(temp_df)
@@ -78,9 +80,10 @@ def augment_data_from_csv(base_data_path: str, target_rows: int):
     final_df = pd.concat(augmented_list, ignore_index=True)
     
     print(f"✅ 數據擴充完成，總筆數：{len(final_df)} 筆。")
+    # 只取目標筆數
     return final_df.head(target_rows)
 
-# --- 2. 資料庫匯入功能 (已修復 NameError 與優化分批寫入) ---
+# --- 2. 資料庫匯入功能 (已優化分批寫入) ---
 
 def import_data_to_db(df: pd.DataFrame, table_name="jobs"):
     """
@@ -91,21 +94,21 @@ def import_data_to_db(df: pd.DataFrame, table_name="jobs"):
         return
     
     # ----------------------------------------------------
-    # 這是先前遺失的欄位清理邏輯，必須在這裡執行！
+    # 執行欄位清理與重命名
     # ----------------------------------------------------
     
-    # 數據欄位對應
+    # 數據欄位對應（重命名為資料庫表格欄位名稱）
     df_clean = df.rename(columns={
-        'OCCU_DESC': 'title',       
-        'JOB_DETAIL': 'detail',     
-        'COMPNAME': 'company',      
-        'NT_L': 'salary_min',       
-        'NT_U': 'salary_max',       
-        'CITYNAME': 'location',     
+        'OCCU_DESC': 'title',      
+        'JOB_DETAIL': 'detail',    
+        'COMPNAME': 'company',     
+        'NT_L': 'salary_min',      
+        'NT_U': 'salary_max',      
+        'CITYNAME': 'location',    
         'EXPERIENCE': 'experience', 
     })
     
-    # 增加 AI 相關的模擬欄位
+    # 增加模擬的 AI 相關欄位
     df_clean['match_score'] = [random.uniform(0.5, 0.95) for _ in range(len(df_clean))]
     df_clean['ai_risk_level'] = [random.choice(['Low', 'Medium', 'High']) for _ in range(len(df_clean))]
     
@@ -118,22 +121,23 @@ def import_data_to_db(df: pd.DataFrame, table_name="jobs"):
     print(f"--- 開始匯入 {len(df_to_import)} 筆數據到資料庫，分批寫入中... ---")
     
     try:
-        # 由於您之前遇到交易鎖定問題，這裡再次建立連線引擎
+        # 建立資料庫連線引擎
         engine = create_engine(DATABASE_URL)
         
-        # 關鍵優化：使用 chunksize=5000 進行分批寫入，降低資料庫壓力
+        # 使用 chunksize 分批寫入，降低資料庫壓力。if_exists='replace' 會重建表格。
         df_to_import.to_sql(
             table_name, 
             engine, 
             if_exists='replace', 
             index=False, 
             method='multi',
-            chunksize=5000  # <--- 分批寫入
+            chunksize=5000 
         )
         print(f"✅ 數據成功匯入表格 '{table_name}'！總筆數：{len(df_to_import)}")
         
     except Exception as e:
         print(f"❌ 資料庫匯入失敗！錯誤：{e}")
+        
 # --- 3. 主執行區塊 ---
 
 if __name__ == "__main__":
