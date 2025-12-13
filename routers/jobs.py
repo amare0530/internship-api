@@ -1,9 +1,12 @@
+# backend/routers/job.py
+
 from fastapi import APIRouter, HTTPException
-#  修正：使用完整的模組路徑，指向 backend/app/services/database.py
-from backend.app.services import database 
+# 🚨 修正：使用相對匯入，因為我們將配置 PYTHONPATH 環境變數
+from ..app.services import database 
 
 # 設置 router 的標籤 (tags)，讓 FastAPI 知道這些路由屬於 'Jobs'
 router = APIRouter(tags=["Jobs"])
+
 
 
 # 1. 職缺列表 (URL 將是 /jobs)
