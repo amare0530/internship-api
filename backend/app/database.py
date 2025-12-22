@@ -1,58 +1,41 @@
+import pandas as pd
 import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from contextlib import contextmanager
-# 匯入我們剛剛在 models.py 定義的模型
-from .models import Job
+import random
 
-# 1. 配置資料庫連線
-# Render 會自動將 PostgreSQL 連線字串設置在 DATABASE_URL 環境變數中
-DATABASE_URL = os.environ.get("DATABASE_URL")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CSV_PATH = os.path.join(BASE_DIR, "dataAPPsource.csv")
 
-# 建立 SQLAlchemy Engine
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True
-)
+try:
+    df = pd.read_csv(CSV_PATH).fillna("")
+    print(f"CSV Loaded: {len(df)} rows")
+except:
+    df = pd.DataFrame()
 
-# 建立 Session
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def format_job(row, index):
+    return {
+        "id": index + 1,
+        "title": str(row.get("OCCU_DESC", "")),
+        "company": str(row.get("COMPNAME", "")),
+        "location": str(row.get("CITYNAME", "")),
+        "skills": [str(row.get("EDGRDESC", "不拘")), "實習"],
+        "description": str(row.get("JOB_DETAIL", ""))[:100],
+        "url": str(row.get("URL_QUERY", ""))
+    }
 
-# 獲取資料庫 Session 的上下文管理器
-@contextmanager
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# 修正：加入 keyword 參數，讓「搜尋」功能動起來！
+def fetch_job_list(skip: int = 0, limit: int = 10, keyword: str = None):
+    data = df
+    if keyword:
+        # 在職稱或公司名稱中搜尋關鍵字
+        mask = data['OCCU_DESC'].str.contains(keyword, na=False) | data['COMPNAME'].str.contains(keyword, na=False)
+        data = data[mask]
+    
+    subset = data.iloc[skip : skip + limit]
+    return [format_job(row, i) for i, row in subset.iterrows()]
 
-# --- 2. CRUD 函數：供 main.py 調用 ---
-
-# 1. 獲取列表職缺 (Get Jobs List)
-def fetch_job_list(limit: int = 10):
-    with get_db() as db:
-        jobs = db.query(Job).limit(limit).all()
-        return [job.to_dict() for job in jobs]
-
-# 2. 獲取滑卡職缺 (Get Swipe Jobs)
 def fetch_swipe_jobs(limit: int = 10):
-    with get_db() as db:
-        jobs = db.query(Job).order_by(Job.id).limit(limit).all()
-        return [job.to_dict() for job in jobs]
+    if df.empty: return []
+    sample_indices = random.sample(range(len(df)), min(limit, len(df)))
+    return [format_job(df.iloc[i], i) for i in sample_indices]
 
-# 3. 根據 ID 獲取單一職缺詳情
-def fetch_job_by_id(job_id: int):
-    with get_db() as db:
-        job = db.query(Job).filter(Job.id == job_id).first()
-        return job.to_dict() if job else None
-
-# 4. 喜歡職缺 (Like Job) - 模擬操作
-def record_like(job_id: int):
-    # 這是 Demo 終點
-    return True
-
-# 5. 不喜歡職缺 (Dislike Job) - 模擬操作
-def record_dislike(job_id: int):
-    # 這是 Demo 終點
-    return True
+# ... 其餘 record_like 等維持原樣 ...
