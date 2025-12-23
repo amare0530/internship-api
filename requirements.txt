@@ -1,0 +1,16 @@
+# 核心 Web 框架
+fastapi
+uvicorn[standard]
+
+# 資料庫連線與 ORM
+sqlalchemy
+psycopg2-binary
+python-dotenv
+
+# 資料驗證與工具
+pydantic[email]
+requests
+python-multipart
+
+# 非同步支援 (如有需要)
+anyio
